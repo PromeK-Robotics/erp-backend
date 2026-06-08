@@ -5,6 +5,41 @@ from datetime import datetime
 
 app = FastAPI()
 
+# ✅ CORS per collegare frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ DATI (puoi modificarli)
+commesse = []
+risorse = []
+
+# ✅ TEST
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+# ✅ GET COMMESSE
+@app.get("/commesse")
+def get_commesse():
+    return commesse
+
+# ✅ CREA COMMESSA
+@app.post("/commesse")
+def crea_commessa(data: dict):
+    commesse.append(data)
+    return {"ok": True}
+
+# ✅ RISORSE
+@app.get("/risorse")
+def get_risorse():
+    return [
+        {"nome": "Mario", "carico": 80},
+        {"nome": "Luca", "carico": 50}
+    ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
