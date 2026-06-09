@@ -13,7 +13,8 @@ app.add_middleware(
 )
 
 # ⚠️ INSERISCI QUI I TUOI DATI SUPABASE
-conn = get_conn(
+def get_conn():
+ return psycopg2.connect(
     host="db.xpjolxzococqmsaxayat.supabase.co",
     database="postgres",
     user="postgres",
