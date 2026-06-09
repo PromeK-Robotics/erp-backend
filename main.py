@@ -1,84 +1,38 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import csv, os
-from datetime import datetime
+import psycopg2, os
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_methods=["*"],allow_headers=["*"])
 
-# ✅ CORS per collegare frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+conn = psycopg2.connect(host=os.getenv("DB_HOST"),database="postgres",user="postgres",password=os.getenv("DB_PASS"))
 
-# ✅ DATI (puoi modificarli)
-commesse = []
-risorse = []
-
-# ✅ TEST
 @app.get("/")
-def root():
-    return {"status": "ok"}
+def root(): return {"status":"ok"}
 
-# ✅ GET COMMESSE
 @app.get("/commesse")
-def get_commesse():
-    return commesse
+def get():
+ cur=conn.cursor();cur.execute("SELECT codice,cliente,stato,avanzamento,preventivo FROM commesse")
+ rows=cur.fetchall()
+ return [{"codice":r[0],"cliente":r[1],"stato":r[2],"avanzamento":r[3],"preventivo":r[4]} for r in rows]
 
-# ✅ CREA COMMESSA
 @app.post("/commesse")
-def crea_commessa(data: dict):
-    commesse.append(data)
-    return {"ok": True}
+def create(d:dict):
+ cur=conn.cursor()
+ cur.execute("INSERT INTO commesse (codice,cliente,stato,avanzamento,preventivo) VALUES (%s,%s,%s,%s,%s)",(d["codice"],d["cliente"],d.get("stato","nuova"),0,d.get("preventivo",0)))
+ conn.commit()
+ return {"ok":True}
 
-# ✅ RISORSE
-@app.get("/risorse")
-def get_risorse():
-    return [
-        {"nome": "Mario", "carico": 80},
-        {"nome": "Luca", "carico": 50}
-    ]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
+@app.post("/ore")
+def ore(d:dict):
+ cur=conn.cursor()
+ cur.execute("INSERT INTO ore (commessa,ore,costo_orario) VALUES (%s,%s,%s)",(d["commessa"],d["ore"],d["costo_orario"]))
+ conn.commit()
+ return {"ok":True}
 
-PERCORSO = os.getenv("ORDINI_PATH", "./ordini_progest/")
-
-@app.get("/")
-def root():
-    return {"status":"ok"}
-
-@app.get("/commesse")
-def commesse():
-    return [{"id":1,"codice":"C-001","cliente":"ABC SRL"}]
-
-@app.post("/genera-ordine")
-def genera_ordine(data: dict):
-    os.makedirs(PERCORSO, exist_ok=True)
-
-    filename = f"{PERCORSO}ORDINE_{data['commessa']}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
-
-    with open(filename, "w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file, delimiter=';')
-        writer.writerow(["TipoDoc","Cliente","Data","CodiceCommessa","Articolo","Descrizione","Quantità","Prezzo"])
-
-        oggi = datetime.now().strftime("%Y-%m-%d")
-
-        for r in data["righe"]:
-            writer.writerow([
-                "ORDINE",
-                data["cliente"],
-                oggi,
-                data["commessa"],
-                r["articolo"],
-                r.get("descrizione",""),
-                r["quantita"],
-                r.get("prezzo",0)
-            ])
-
-    return {"file": filename}
+@app.get("/economico/{cod}")
+def eco(cod:str):
+ cur=conn.cursor()
+ cur.execute("SELECT SUM(ore*costo_orario) FROM ore WHERE commessa=%s",(cod,))
+ costo=cur.fetchone()[0] or 0
+ return {"preventivo":100000,"costo":costo,"margine":100000-costo}
